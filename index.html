@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application 3D</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: #fff;
+            background-color: rgba(0,0,0,0.5);
+            padding: 5px;
+            z-index: 1000;
+        }
+        #objectList {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #objectList ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #objectList li {
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+        }
+        #objectList li:hover {
+            background-color: #f0f0f0;
+        }
+        #objectList li.selected {
+            background-color: #808080;
+            color: white;
+        }
+        #importObjectList {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        #importObjectList ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        #importObjectList li {
+            padding: 5px;
+            border-bottom: 1px solid #ccc;
+            cursor: pointer;
+        }
+        #importObjectList li:hover {
+            background-color: #f0f0f0;
+        }
+        #saveLoadButtons {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            z-index: 1000;
+        }
+        #saveLoadButtons button {
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        "W" translate | "E" rotate | "R" scale | "+/-" adjust size<br />
+        "X" toggle X | "Y" toggle Y | "Z" toggle Z | "Spacebar" toggle enabled<br />
+        "Esc" reset current transform
+    </div>
+    <div id="saveLoadButtons">
+        <button id="saveButton">Sauvegarder la scène</button>
+        <button id="loadButton">Charger la scène</button>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.150.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.150.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
