@@ -121,7 +121,7 @@ async function init() {
 async function loadInitialObject() {
     return new Promise((resolve, reject) => {
         loader.load(
-            './geoBase/votre_objet.gltf', // Assurez-vous que ce chemin est correct
+            'geoBase/votre_objet.gltf', // Assurez-vous que ce chemin est correct
             function (gltf) {
                 const model = gltf.scene;
                 model.name = 'initialObject';
@@ -366,7 +366,7 @@ function deleteSelectedObject() {
 
 async function listFiles() {
     try {
-        const response = await fetch('/file-list.json');
+        const response = await fetch('file-list.json');
         if (!response.ok) {
             throw new Error('Erreur lors de la récupération de la liste des fichiers');
         }
@@ -437,7 +437,7 @@ function importObject(filename, savedData = null) {
     }
 
     loader.load(
-        `/geo/${filename}`,
+        `geo/${filename}`,
         function (gltf) {
             const model = gltf.scene;
             model.name = newName;
