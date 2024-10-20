@@ -17,6 +17,8 @@ const TRANSFORM_COOLDOWN = 200; // millisecondes
 
 let lastRotationY = 0;
 
+let sceneHasChanged = true;
+
 init();
 render();
 
@@ -90,7 +92,9 @@ async function init() {
         }
     });
 
+    // Ajoutez le TransformControls à la scène, mais ne l'attachez à aucun objet pour l'instant
     scene.add(control);
+    control.visible = false; // Cachez-le initialement
 
     window.addEventListener('resize', onWindowResize);
     window.addEventListener('keydown', onKeyDown);
@@ -115,6 +119,11 @@ async function init() {
     // Ajouter les écouteurs d'événements pour les boutons de sauvegarde et de chargement
     document.getElementById('saveButton').addEventListener('click', saveScene);
     document.getElementById('loadButton').addEventListener('click', loadScene);
+    document.getElementById('renderButton').addEventListener('click', renderAndDownload);
+    document.getElementById('depthRenderButton').addEventListener('click', renderDepthAndDownload);
+
+    // Appelez render() après avoir chargé l'objet initial
+    render();
 }
 
 // Ajoutez cette nouvelle fonction pour charger l'objet initial
@@ -194,7 +203,22 @@ function onKeyDown(event) {
 }
 
 function render() {
-    renderer.render(scene, camera);
+    console.log("Début de la fonction render");
+    console.log("État du TransformControls:", control);
+    if (control && control.object) {
+        console.log("TransformControls a un objet attaché:", control.object);
+    } else {
+        console.log("TransformControls n'a pas d'objet attaché");
+    }
+    
+    try {
+        renderer.render(scene, camera);
+        console.log("Rendu effectué avec succès");
+    } catch (error) {
+        console.error("Erreur lors du rendu:", error);
+    }
+    
+    console.log("Fin de la fonction render");
 }
 
 function selectObject(object) {
@@ -233,6 +257,7 @@ function selectObject(object) {
     updateObjectList();
     render();
     console.log("Fin de selectObject");
+    sceneHasChanged = true;
 }
 
 function onCanvasClick(event) {
@@ -295,7 +320,12 @@ function animate() {
     requestAnimationFrame(animate);
     orbit.update();
     updateBoundingBox();
-    render();
+    
+    // Appelez render() seulement si nécessaire, par exemple si la scène a changé
+    if (sceneHasChanged) {
+        render();
+        sceneHasChanged = false;
+    }
 }
 
 function addBoundingBox(object) {
@@ -345,6 +375,7 @@ function updateBoundingBox() {
 function deleteSelectedObject() {
     if (selectedObject) {
         control.detach();
+        scene.remove(control);
         
         scene.remove(selectedObject);
         
@@ -476,6 +507,7 @@ function importObject(filename, savedData = null) {
             console.error('Une erreur s\'est produite lors du chargement:', error);
         }
     );
+    sceneHasChanged = true;
 }
 
 // Fonction pour sauvegarder la scène
@@ -543,3 +575,170 @@ function loadScene() {
 
     input.click();
 }
+
+function renderAndDownload() {
+    // Désactiver les contrôles TransformControls et OrbitControls
+    control.enabled = false;
+    orbit.enabled = false;
+
+    // Cacher les helpers
+    if (boundingBoxHelper) boundingBoxHelper.visible = false;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = false;
+    });
+
+    // Détacher le TransformControls
+    const attachedObject = control.object;
+    if (attachedObject) {
+        control.detach();
+    }
+
+    // Faire le rendu
+    renderer.render(scene, camera);
+
+    // Créer une image à partir du rendu
+    const imgData = renderer.domElement.toDataURL("image/png");
+
+    // Créer un lien de téléchargement
+    const link = document.createElement('a');
+    link.href = imgData;
+    link.download = 'scene_render.png';
+    link.click();
+
+    // Réactiver les contrôles et les helpers
+    control.enabled = true;
+    orbit.enabled = true;
+    if (boundingBoxHelper) boundingBoxHelper.visible = true;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = true;
+    });
+
+    // Réattacher le TransformControls si nécessaire
+    if (attachedObject) {
+        control.attach(attachedObject);
+    }
+
+    // Refaire le rendu pour afficher les helpers
+    render();
+}
+
+function renderDepthAndDownload() {
+    console.log("Début de renderDepthAndDownload");
+
+    // Désactiver les contrôles et cacher les helpers
+    control.enabled = false;
+    orbit.enabled = false;
+    if (boundingBoxHelper) boundingBoxHelper.visible = false;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = false;
+    });
+
+    // Retirer temporairement le TransformControls de la scène
+    scene.remove(control);
+    console.log("TransformControls retiré de la scène");
+
+    // Sauvegarder les matériaux originaux et calculer les limites de la scène
+    const originalMaterials = new Map();
+    const boundingBox = new THREE.Box3();
+    scene.traverse((object) => {
+        if (object.isMesh) {
+            originalMaterials.set(object, object.material);
+            boundingBox.expandByObject(object);
+        }
+    });
+
+    // Calculer les valeurs near et far pour le MeshDepthMaterial
+    const center = boundingBox.getCenter(new THREE.Vector3());
+    const size = boundingBox.getSize(new THREE.Vector3());
+    const maxDimension = Math.max(size.x, size.y, size.z);
+    const near = camera.near;
+    const far = camera.far;
+
+    console.log(`Limites de profondeur calculées : near = ${near}, far = ${far}`);
+
+    // Créer un MeshDepthMaterial personnalisé
+    const depthMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            cameraNear: { value: camera.near },
+            cameraFar: { value: camera.far },
+            minDepth: { value: 1.0 },  // Nouvelle valeur minimale de profondeur
+            maxDepth: { value: 15.0 }, // Nouvelle valeur maximale de profondeur
+        },
+        vertexShader: `
+            varying float vDepth;
+            void main() {
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                vDepth = -(modelViewMatrix * vec4(position, 1.0)).z;
+            }
+        `,
+        fragmentShader: `
+            uniform float cameraNear;
+            uniform float cameraFar;
+            uniform float minDepth;
+            uniform float maxDepth;
+            varying float vDepth;
+            void main() {
+                float depth = smoothstep(minDepth, maxDepth, vDepth);
+                gl_FragColor = vec4(vec3(1.0 - depth), 1.0);
+            }
+        `
+    });
+
+    // Appliquer le matériau de profondeur personnalisé
+    scene.traverse((object) => {
+        if (object.isMesh) {
+            object.material = depthMaterial;
+        }
+    });
+
+    console.log("Matériau de profondeur personnalisé appliqué");
+
+    // Faire le rendu
+    try {
+        renderer.render(scene, camera);
+        console.log("Rendu effectué avec succès");
+    } catch (error) {
+        console.error("Erreur lors du rendu:", error);
+    }
+
+    // Créer une image à partir du rendu
+    const imgData = renderer.domElement.toDataURL("image/png");
+
+    // Créer un lien de téléchargement
+    const link = document.createElement('a');
+    link.href = imgData;
+    link.download = 'depth_render.png';
+    link.click();
+    console.log("Image téléchargée");
+
+    // Restaurer les matériaux originaux
+    scene.traverse((object) => {
+        if (object.isMesh && originalMaterials.has(object)) {
+            object.material = originalMaterials.get(object);
+        }
+    });
+    console.log("Matériaux originaux restaurés");
+
+    // Réactiver les contrôles et les helpers
+    control.enabled = true;
+    orbit.enabled = true;
+    if (boundingBoxHelper) boundingBoxHelper.visible = true;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = true;
+    });
+
+    // Remettre le TransformControls dans la scène
+    scene.add(control);
+    console.log("TransformControls remis dans la scène");
+
+    // Refaire le rendu pour afficher la scène normale
+    try {
+        render();
+        console.log("Rendu final effectué avec succès");
+    } catch (error) {
+        console.error("Erreur lors du rendu final:", error);
+    }
+
+    console.log("Fin de renderDepthAndDownload");
+}
+
