@@ -61,6 +61,13 @@
         #saveLoadButtons button {
             margin-right: 10px;
         }
+        #saveLoadButtons input[type="number"] {
+            width: 60px;
+            margin-right: 10px;
+        }
+        #saveLoadButtons label {
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -74,6 +81,14 @@
         <button id="loadButton">Charger la scène</button>
         <button id="renderButton">Rendu et téléchargement</button>
         <button id="depthRenderButton">Rendu Z-depth</button>
+        <button id="objectIdRenderButton">Rendu Object ID</button>
+        <button id="normalRenderButton">Rendu Normal Map</button>
+        <div>
+            <label for="minDepth">Min Depth:</label>
+            <input type="number" id="minDepth" value="1.0" step="0.1" min="0.1">
+            <label for="maxDepth">Max Depth:</label>
+            <input type="number" id="maxDepth" value="15.0" step="0.1" min="0.1">
+        </div>
     </div>
     <script type="importmap">
         {

@@ -121,6 +121,8 @@ async function init() {
     document.getElementById('loadButton').addEventListener('click', loadScene);
     document.getElementById('renderButton').addEventListener('click', renderAndDownload);
     document.getElementById('depthRenderButton').addEventListener('click', renderDepthAndDownload);
+    document.getElementById('objectIdRenderButton').addEventListener('click', renderObjectIdAndDownload);
+    document.getElementById('normalRenderButton').addEventListener('click', renderNormalMapAndDownload);
 
     // Appelez render() après avoir chargé l'objet initial
     render();
@@ -625,6 +627,10 @@ function renderAndDownload() {
 function renderDepthAndDownload() {
     console.log("Début de renderDepthAndDownload");
 
+    // Récupérer les valeurs de minDepth et maxDepth depuis les champs de saisie
+    const minDepth = parseFloat(document.getElementById('minDepth').value);
+    const maxDepth = parseFloat(document.getElementById('maxDepth').value);
+
     // Désactiver les contrôles et cacher les helpers
     control.enabled = false;
     orbit.enabled = false;
@@ -661,8 +667,8 @@ function renderDepthAndDownload() {
         uniforms: {
             cameraNear: { value: camera.near },
             cameraFar: { value: camera.far },
-            minDepth: { value: 1.0 },  // Nouvelle valeur minimale de profondeur
-            maxDepth: { value: 15.0 }, // Nouvelle valeur maximale de profondeur
+            minDepth: { value: minDepth },  // Utiliser la valeur saisie par l'utilisateur
+            maxDepth: { value: maxDepth },  // Utiliser la valeur saisie par l'utilisateur
         },
         vertexShader: `
             varying float vDepth;
@@ -742,3 +748,155 @@ function renderDepthAndDownload() {
     console.log("Fin de renderDepthAndDownload");
 }
 
+function renderObjectIdAndDownload() {
+    console.log("Début de renderObjectIdAndDownload");
+
+    // Désactiver les contrôles et cacher les helpers
+    control.enabled = false;
+    orbit.enabled = false;
+    if (boundingBoxHelper) boundingBoxHelper.visible = false;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = false;
+    });
+
+    // Retirer temporairement le TransformControls de la scène
+    scene.remove(control);
+
+    // Sauvegarder les matériaux originaux
+    const originalMaterials = new Map();
+    const objectColors = new Map();
+
+    // Fonction pour générer une couleur aléatoire
+    function getRandomColor() {
+        return Math.floor(Math.random()*16777215);
+    }
+
+    // Appliquer un matériau unique à chaque objet
+    scene.traverse((object) => {
+        if (object.isMesh) {
+            originalMaterials.set(object, object.material);
+            let color = getRandomColor();
+            while (objectColors.has(color)) {
+                color = getRandomColor();
+            }
+            objectColors.set(color, object);
+            object.material = new THREE.MeshBasicMaterial({ color: color });
+        }
+    });
+
+    // Faire le rendu
+    renderer.render(scene, camera);
+
+    // Créer une image à partir du rendu
+    const imgData = renderer.domElement.toDataURL("image/png");
+
+    // Créer un lien de téléchargement
+    const link = document.createElement('a');
+    link.href = imgData;
+    link.download = 'object_id_render.png';
+    link.click();
+
+    // Restaurer les matériaux originaux
+    scene.traverse((object) => {
+        if (object.isMesh && originalMaterials.has(object)) {
+            object.material = originalMaterials.get(object);
+        }
+    });
+
+    // Réactiver les contrôles et les helpers
+    control.enabled = true;
+    orbit.enabled = true;
+    if (boundingBoxHelper) boundingBoxHelper.visible = true;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = true;
+    });
+
+    // Remettre le TransformControls dans la scène
+    scene.add(control);
+
+    // Refaire le rendu pour afficher la scène normale
+    render();
+
+    console.log("Fin de renderObjectIdAndDownload");
+}
+
+function renderNormalMapAndDownload() {
+    console.log("Début de renderNormalMapAndDownload");
+
+    // Désactiver les contrôles et cacher les helpers
+    control.enabled = false;
+    orbit.enabled = false;
+    if (boundingBoxHelper) boundingBoxHelper.visible = false;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = false;
+    });
+
+    // Retirer temporairement le TransformControls de la scène
+    scene.remove(control);
+
+    // Sauvegarder les matériaux originaux
+    const originalMaterials = new Map();
+
+    // Créer un shader pour le rendu des normales
+    const normalMaterial = new THREE.ShaderMaterial({
+        vertexShader: `
+            varying vec3 vNormal;
+            
+            void main() {
+                vNormal = normalize(normalMatrix * normal);
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vNormal;
+            
+            void main() {
+                vec3 normal = normalize(vNormal);
+                gl_FragColor = vec4(normal * 0.5 + 0.5, 1.0);
+            }
+        `
+    });
+
+    // Appliquer le matériau de normal map à chaque objet
+    scene.traverse((object) => {
+        if (object.isMesh) {
+            originalMaterials.set(object, object.material);
+            object.material = normalMaterial;
+        }
+    });
+
+    // Faire le rendu
+    renderer.render(scene, camera);
+
+    // Créer une image à partir du rendu
+    const imgData = renderer.domElement.toDataURL("image/png");
+
+    // Créer un lien de téléchargement
+    const link = document.createElement('a');
+    link.href = imgData;
+    link.download = 'normal_map_render.png';
+    link.click();
+
+    // Restaurer les matériaux originaux
+    scene.traverse((object) => {
+        if (object.isMesh && originalMaterials.has(object)) {
+            object.material = originalMaterials.get(object);
+        }
+    });
+
+    // Réactiver les contrôles et les helpers
+    control.enabled = true;
+    orbit.enabled = true;
+    if (boundingBoxHelper) boundingBoxHelper.visible = true;
+    scene.children.forEach(child => {
+        if (child.type === 'GridHelper') child.visible = true;
+    });
+
+    // Remettre le TransformControls dans la scène
+    scene.add(control);
+
+    // Refaire le rendu pour afficher la scène normale
+    render();
+
+    console.log("Fin de renderNormalMapAndDownload");
+}
